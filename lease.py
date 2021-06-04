@@ -5,6 +5,7 @@ import socket
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from prometheus_client import Counter
+from pymongo import ReturnDocument
 from sanic import Sanic, response
 from sanic.exceptions import InvalidUsage, NotFound
 from sanic_prometheus import monitor
@@ -14,6 +15,7 @@ from wtforms.validators import DataRequired, IPAddress, NumberRange
 
 submit_count = Counter("pinecrypt_lease_submit", "IP updates", ["service"])
 flush_count = Counter("pinecrypt_lease_flush", "IP assignment flushes", ["service"])
+migration_count = Counter("pinecrypt_migration", "Client has migrated to this replica", ["replica"])
 not_found_count = Counter("pinecrypt_lease_not_found", "Certificate not found", ["service"])
 
 class LeaseUpdateForm(SanicForm):
@@ -42,24 +44,26 @@ async def submit(request, q):
     if not form.validate():
         raise InvalidUsage("Invalid form input")
 
-    result = await app.ctx.db.certidude_certificates.update_one(q, {
+    instance = "%s-%s" % (FQDN, form.service.data)
+    doc = await app.ctx.db.certidude_certificates.find_one_and_update(q, {
         "$set": {
             "last_seen": datetime.utcnow(),
-            "instance": "%s-%s" % (FQDN, form.service.data),
+            "instance": instance,
             "remote.port": form.remote_port.data,
             "remote.addr": form.remote_addr.data,
         },
         "$addToSet": {
             "ip": form.internal_addr.data
         }
-    })
-    if result.modified_count == 1:
+    }, return_document=ReturnDocument.BEFORE)
+    if doc:
         submit_count.labels(form.service.data).inc()
-        return response.text('Lease updated')
+        if doc["instance"] != "instance":
+            migration_count.labels(const.FQDN).inc()
+        return response.text('Client lease info updated')
     else:
-        assert result.modified_count == 0
         not_found_count.labels(form.service.data).inc()
-        raise NotFound("Node not found")
+        raise NotFound("Client not found")
 
 
 @app.route("/api/by-serial/<serial_number:int>", methods=["GET"])
