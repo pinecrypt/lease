@@ -58,8 +58,8 @@ async def submit(request, q):
     }, return_document=ReturnDocument.BEFORE)
     if doc:
         submit_count.labels(form.service.data).inc()
-        if doc["instance"] != "instance":
-            migration_count.labels(const.FQDN).inc()
+        if doc.get("instance") != instance:
+            migration_count.labels(FQDN).inc()
         return response.text('Client lease info updated')
     else:
         not_found_count.labels(form.service.data).inc()
