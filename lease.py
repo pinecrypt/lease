@@ -13,10 +13,22 @@ from sanic_wtf import SanicForm
 from wtforms import IntegerField, StringField
 from wtforms.validators import DataRequired, IPAddress, NumberRange
 
-submit_count = Counter("pinecrypt_lease_submit", "IP updates", ["service"])
-flush_count = Counter("pinecrypt_lease_flush", "IP assignment flushes", ["service"])
-migration_count = Counter("pinecrypt_migration", "Client has migrated to this replica", ["replica"])
-not_found_count = Counter("pinecrypt_lease_not_found", "Certificate not found", ["service"])
+submit_count = Counter(
+    "pinecrypt_gateway_lease_updates",
+    "Client IP address updates.",
+    ["service"])
+flush_count = Counter(
+    "pinecrypt_gateway_lease_flushes",
+    "Client IP address flushes.",
+    ["service"])
+migration_count = Counter(
+    "pinecrypt_gateway_lease_migrations",
+    "Client migrations to this replica.",
+    ["replica"])
+not_found_count = Counter(
+    "pinecrypt_gateway_lease_not_found",
+    "Invalid connection attempts.",
+    ["service"])
 
 class LeaseUpdateForm(SanicForm):
     service = StringField("Service name")
